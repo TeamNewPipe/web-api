@@ -89,6 +89,9 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         repo_url = "https://api.github.com/repos/TeamNewPipe/NewPipe"
 
+        translations_url = "https://hosted.weblate.org/api/components/" \
+                           "newpipe/strings/translations/"
+
         def make_request(url: str):
             kwargs = dict(headers={
                 "User-Agent": ""
@@ -103,13 +106,16 @@ class DataJsonHandler(tornado.web.RequestHandler):
             fetch(make_request(repo_url)),
             fetch(make_request(stable_url)),
             fetch(make_request(beta_url)),
+            fetch(make_request(repo_url + "/contributors")),
+            fetch(make_request(translations_url)),
         ))
 
         for response in responses:
             if not self.validate_response(response):
                 return False
 
-        repo_data, stable_data, beta_data = [x.body for x in responses]
+        repo_data, stable_data, beta_data, \
+        contributors_data, translations_data = [x.body for x in responses]
 
         def assemble_release_data(data: str):
             if isinstance(data, bytes):
@@ -121,11 +127,17 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 "version": versions[-1],
             }
 
-        repo_data = json.loads(repo_data)
+        repo = json.loads(repo_data)
+        contributors = json.loads(contributors_data)
+        translations = json.loads(translations_data)
 
         data = {
             "stats": {
-                "stargazers": repo_data["stargazers_count"],
+                "stargazers": repo["stargazers_count"],
+                "watchers": repo["watchers_count"],
+                "forks": repo["forks_count"],
+                "contributors": len(contributors),
+                "translations": int(translations["count"]),
             },
             "flavors": {
                 "stable": assemble_release_data(stable_data),
