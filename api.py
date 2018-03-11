@@ -4,6 +4,7 @@ import functools
 import json
 import logging
 import random
+import re
 import string
 import tornado.httpclient
 import tornado.ioloop
@@ -20,7 +21,7 @@ def random_string(length=20):
     return "".join((random.choice(alphabet) for i in range(length)))
 
 
-class CurrentVersionHandler(tornado.web.RequestHandler):
+class DataJsonHandler(tornado.web.RequestHandler):
     # 1 hour as a timeout is neither too outdated nor requires bothering
     # GitHub too often
     _timeout = timedelta(hours=1)
@@ -36,7 +37,6 @@ class CurrentVersionHandler(tornado.web.RequestHandler):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.http_client = tornado.httpclient.AsyncHTTPClient()
         self.logger = logging.getLogger("tornado.general")
 
     def add_default_headers(self):
@@ -58,26 +58,91 @@ class CurrentVersionHandler(tornado.web.RequestHandler):
     @gen.coroutine
     def get(self):
         if self.is_request_outdated():
-            yield self.make_request()
+            yield self.fetch_data_and_assemble_response()
 
         else:
             self.add_default_headers()
             self.write(self._cached_response)
 
+    def validate_response(self, response: tornado.httpclient.HTTPResponse):
+        if response.error:
+            # release lock in case of errors
+            self.__class__._lock.release()
+            self.logger.log(
+                logging.ERROR,
+                "GitHub API error: {}".format(response.error)
+            )
+            self.send_error(500)
+            return False
+
+        return True
+
     @gen.coroutine
-    def make_request(self):
+    def fetch_data_and_assemble_response(self):
         yield self.__class__._lock.acquire()
 
         self.logger.log(logging.INFO, "Fetching latest release from GitHub")
 
-        url = "https://api.github.com/repos/" \
-              "TeamNewPipe/NewPipe/releases/latest"
+        releases_url_template = "https://gitlab.com/fdroid/fdroiddata/raw/master/metadata/{}.txt"
+        stable_url = releases_url_template.format("org.schabi.newpipe")
+        beta_url = releases_url_template.format("org.schabi.newpipe.beta")
 
-        request = tornado.httpclient.HTTPRequest(url, headers={
-            "User-Agent": ""
-        })
+        repo_url = "https://api.github.com/repos/TeamNewPipe/NewPipe"
 
-        yield self.http_client.fetch(request, self.http_callback, False)
+        def make_request(url: str):
+            kwargs = dict(headers={
+                "User-Agent": ""
+            })
+            return tornado.httpclient.HTTPRequest(url, **kwargs)
+
+        def fetch(request: tornado.httpclient.HTTPRequest):
+            http_client = tornado.httpclient.AsyncHTTPClient()
+            return http_client.fetch(request, raise_error=False)
+
+        responses = yield tornado.gen.multi((
+            fetch(make_request(repo_url)),
+            fetch(make_request(stable_url)),
+            fetch(make_request(beta_url)),
+        ))
+
+        for response in responses:
+            if not self.validate_response(response):
+                return False
+
+        repo_data, stable_data, beta_data = [x.body for x in responses]
+
+        def assemble_release_data(data: str):
+            if isinstance(data, bytes):
+                data = data.decode()
+
+            versions = re.findall("commit=(.*)", data)
+
+            return {
+                "version": versions[-1],
+            }
+
+        repo_data = json.loads(repo_data)
+
+        data = {
+            "stats": {
+                "stargazers": repo_data["stargazers_count"],
+            },
+            "flavors": {
+                "stable": assemble_release_data(stable_data),
+                "beta": assemble_release_data(beta_data),
+            }
+        }
+
+        # update cache
+        self.update_cache(data)
+
+        # once cache is updated, release lock
+        self.__class__._lock.release()
+
+        # finish response
+        self.add_default_headers()
+        self.write(data)
+        self.finish()
 
     @classmethod
     def update_cache(cls, data):
@@ -85,34 +150,10 @@ class CurrentVersionHandler(tornado.web.RequestHandler):
         now = datetime.now()
         cls._last_request = now
 
-    def http_callback(self, response: tornado.httpclient.HTTPResponse):
-        if response.error:
-            # release lock in case of errors
-            self.__class__._lock.release()
-            self.logger.log(logging.ERROR,
-                            "GitHub API error: {}".format(response.error))
-            self.send_error(500)
-
-        else:
-            data = json.loads(response.body)
-
-            version = data["name"]
-
-            # update cache
-            self.update_cache(version)
-
-            # once cache is updated, release lock
-            self.__class__._lock.release()
-
-            # finish response
-            self.add_default_headers()
-            self.write(version)
-            self.finish()
-
 
 def make_app():
     return tornado.web.Application([
-        (r"/current-version", CurrentVersionHandler),
+        (r"/data.json", DataJsonHandler),
     ])
 
 
