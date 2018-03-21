@@ -134,7 +134,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
         data = {
             "stats": {
                 "stargazers": repo["stargazers_count"],
-                "watchers": repo["watchers_count"],
+                "watchers": repo["subscribers_count"],
                 "forks": repo["forks_count"],
                 "contributors": len(contributors),
                 "translations": int(translations["count"]),
