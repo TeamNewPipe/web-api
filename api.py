@@ -70,7 +70,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
             self.__class__._lock.release()
             self.logger.log(
                 logging.ERROR,
-                "GitHub API error: {} -> {}".format(response.effective_url, response.error)
+                "GitHub API error: {} -> {} ({})".format(response.effective_url, response.error, response.body),
             )
             self.send_error(500)
             return False
