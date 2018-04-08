@@ -35,6 +35,10 @@ class DataJsonHandler(tornado.web.RequestHandler):
     # request GitHub only once when multiple requests are made in parallel
     _lock = tornado.locks.Lock()
 
+    # make sure to not send too many requests to the GitHub API to not trigger
+    # the rate limit
+    _last_failed_request = (datetime.now() - 2 * _timeout)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.logger = logging.getLogger("tornado.general")
@@ -57,7 +61,17 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
     @gen.coroutine
     def get(self):
-        if self.is_request_outdated():
+        # ensure that timeout is respected
+        now = datetime.now()
+
+        if self.__class__._last_failed_request is not None and \
+                (now - self.__class__._last_failed_request) < self.__class__._timeout:
+            self.logger.log(logging.INFO,
+                            "Request failed recently, waiting for timeout")
+            self.add_default_headers()
+            self.write_error(500)
+
+        elif self.is_request_outdated():
             yield self.fetch_data_and_assemble_response()
 
         else:
@@ -111,6 +125,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         for response in responses:
             if not self.validate_response(response):
+                self.__class__._last_failed_request = datetime.now()
                 return False
 
         repo_data, stable_data, \
