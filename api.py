@@ -70,7 +70,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
             self.__class__._lock.release()
             self.logger.log(
                 logging.ERROR,
-                "GitHub API error: {}".format(response.error)
+                "GitHub API error: {} -> {}".format(response.effective_url, response.error)
             )
             self.send_error(500)
             return False
@@ -105,7 +105,6 @@ class DataJsonHandler(tornado.web.RequestHandler):
         responses = yield tornado.gen.multi((
             fetch(make_request(repo_url)),
             fetch(make_request(stable_url)),
-            fetch(make_request(beta_url)),
             fetch(make_request(repo_url + "/contributors")),
             fetch(make_request(translations_url)),
         ))
@@ -114,7 +113,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
             if not self.validate_response(response):
                 return False
 
-        repo_data, stable_data, beta_data, \
+        repo_data, stable_data, \
         contributors_data, translations_data = [x.body for x in responses]
 
         def assemble_release_data(data: str):
@@ -141,7 +140,6 @@ class DataJsonHandler(tornado.web.RequestHandler):
             },
             "flavors": {
                 "stable": assemble_release_data(stable_data),
-                "beta": assemble_release_data(beta_data),
             }
         }
 
