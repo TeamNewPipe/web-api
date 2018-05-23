@@ -13,6 +13,7 @@ import tornado.options
 import tornado.web
 
 from datetime import datetime, timedelta
+from lxml import html
 from tornado import gen
 
 
@@ -99,9 +100,10 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         releases_url_template = "https://gitlab.com/fdroid/fdroiddata/raw/master/metadata/{}.txt"
         stable_url = releases_url_template.format("org.schabi.newpipe")
-        beta_url = releases_url_template.format("org.schabi.newpipe.beta")
 
         repo_url = "https://api.github.com/repos/TeamNewPipe/NewPipe"
+
+        contributors_url = "https://github.com/TeamNewPipe/NewPipe"
 
         translations_url = "https://hosted.weblate.org/api/components/" \
                            "newpipe/strings/translations/"
@@ -119,7 +121,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
         responses = yield tornado.gen.multi((
             fetch(make_request(repo_url)),
             fetch(make_request(stable_url)),
-            fetch(make_request(repo_url + "/contributors")),
+            fetch(make_request(contributors_url)),
             fetch(make_request(translations_url)),
         ))
 
@@ -142,7 +144,14 @@ class DataJsonHandler(tornado.web.RequestHandler):
             }
 
         repo = json.loads(repo_data)
-        contributors = json.loads(contributors_data)
+
+        elem = html.fromstring(contributors_data)
+        tags = elem.cssselect(".numbers-summary a[href$=contributors] .num")
+        if len(tags) != 1:
+            contributors_count = -1
+        else:
+            contributors_count = int(tags[0].text)
+
         translations = json.loads(translations_data)
 
         data = {
@@ -150,7 +159,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 "stargazers": repo["stargazers_count"],
                 "watchers": repo["subscribers_count"],
                 "forks": repo["forks_count"],
-                "contributors": len(contributors),
+                "contributors": contributors_count,
                 "translations": int(translations["count"]),
             },
             "flavors": {
