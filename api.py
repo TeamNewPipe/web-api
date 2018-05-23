@@ -103,6 +103,8 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         repo_url = "https://api.github.com/repos/TeamNewPipe/NewPipe"
 
+        contributors_url_template = repo_url + "/contributors?per_page=100&page={}"
+
         translations_url = "https://hosted.weblate.org/api/components/" \
                            "newpipe/strings/translations/"
 
@@ -112,15 +114,43 @@ class DataJsonHandler(tornado.web.RequestHandler):
             })
             return tornado.httpclient.HTTPRequest(url, **kwargs)
 
-        def fetch(request: tornado.httpclient.HTTPRequest):
+        def async_fetch(request: tornado.httpclient.HTTPRequest):
             http_client = tornado.httpclient.AsyncHTTPClient()
             return http_client.fetch(request, raise_error=False)
 
+        def linear_fetch(request: tornado.httpclient.HTTPRequest):
+            http_client = tornado.httpclient.HTTPClient()
+            return http_client.fetch(request, raise_error=False)
+
+        # Getting the contributors count is a little more complex
+        # since there is not data filed for it. For this reason, it is necessary
+        # to count all contributors by hand.
+        # At the point of time this script was set up, NewPipe had more than 200 contributors.
+        # Therefore the first 200 contributors are skipped to reduce traffic.
+        # An even more elegant solution is to only get the headers for the first requests.
+        # Do this until there is a response that has a Link header containing a link with rel="last".
+        # For the next (and last request) get the body and count the elements.
+        page = 3
+        contributors = 0
+
+        while True:
+            response = linear_fetch(make_request(contributors_url_template.format(page)))
+            if not self.validate_response(response):
+                self.__class__._last_failed_request = datetime.now()
+                return False
+            contributors_data = response.body
+            elements = len(json.loads(contributors_data))
+
+            if elements < 100:
+                contributors = (page - 1) * 100 + elements
+                break
+
+            page += 1
+
         responses = yield tornado.gen.multi((
-            fetch(make_request(repo_url)),
-            fetch(make_request(stable_url)),
-            fetch(make_request(repo_url + "/contributors")),
-            fetch(make_request(translations_url)),
+            async_fetch(make_request(repo_url)),
+            async_fetch(make_request(stable_url)),
+            async_fetch(make_request(translations_url)),
         ))
 
         for response in responses:
@@ -128,8 +158,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 self.__class__._last_failed_request = datetime.now()
                 return False
 
-        repo_data, stable_data, \
-        contributors_data, translations_data = [x.body for x in responses]
+        repo_data, stable_data, translations_data = [x.body for x in responses]
 
         def assemble_release_data(data: str):
             if isinstance(data, bytes):
@@ -142,7 +171,6 @@ class DataJsonHandler(tornado.web.RequestHandler):
             }
 
         repo = json.loads(repo_data)
-        contributors = json.loads(contributors_data)
         translations = json.loads(translations_data)
 
         data = {
@@ -150,7 +178,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 "stargazers": repo["stargazers_count"],
                 "watchers": repo["subscribers_count"],
                 "forks": repo["forks_count"],
-                "contributors": len(contributors),
+                "contributors": contributors,
                 "translations": int(translations["count"]),
             },
             "flavors": {
