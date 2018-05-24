@@ -3,7 +3,7 @@ FROM python:3.6-alpine
 MAINTAINER "TheAssassin <theassassin@assassinate-you.net>"
 
 # install dependencies
-RUN apk add --no-cache gcc libxml2-dev libxml2 musl-dev xmlsec xmlsec-dev
+RUN apk add --no-cache gcc libxml2-dev libxml2 musl-dev xmlsec xmlsec-dev curl
 
 # create non-root user
 RUN adduser -S app
@@ -14,6 +14,9 @@ RUN pip install -r requirements.txt
 USER app
 
 COPY api.py /
+
+HEALTHCHECK --interval=5m --timeout=3s \
+    CMD curl -f http://localhost:3000/ || exit 1
 
 EXPOSE 3000
 
