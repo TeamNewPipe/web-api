@@ -16,7 +16,7 @@ USER app
 COPY api.py /
 
 HEALTHCHECK --interval=5m --timeout=3s \
-    CMD curl -f http://localhost:3000/ || exit 1
+    CMD curl -f http://localhost:3000/data.json || exit 1
 
 EXPOSE 3000
 
