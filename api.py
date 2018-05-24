@@ -150,7 +150,10 @@ class DataJsonHandler(tornado.web.RequestHandler):
         if len(tags) != 1:
             contributors_count = -1
         else:
-            contributors_count = int(tags[0].text)
+            try:
+                contributors_count = int(tags[0].text)
+            except:
+                contributors_data = -1
 
         translations = json.loads(translations_data)
 
