@@ -136,20 +136,22 @@ class DataJsonHandler(tornado.web.RequestHandler):
         repo_data, stable_data, release_github_data, \
         contributors_data, translations_data = [x.body for x in responses]
 
-        def assemble_release_data(version_data: str, github_apk: str):
+        def assemble_release_data(version_data: str):
             if isinstance(version_data, bytes):
                 version_data = version_data.decode()
 
             versions = re.findall("commit=(.*)", version_data)
-
+            version_codes = re.findall("Build:(.*)", version_data)
+            version_code = version_codes[-1].split(",")[-1]
             return {
                 "version": versions[-1],
-                "github_apk": github_apk,
+                "version_code": version_code,
+                "apk": "https://f-droid.org/repo/org.schabi.newpipe_" + version_code + ".apk",
             }
 
         repo = json.loads(repo_data)
 
-        # scrap latest GitHub apk from website
+        # scrap latest GitHub version and apk from website
         elem = html.fromstring(release_github_data)
         tags = elem.cssselect('.release-body li.d-block a[href$=".apk"]')
         if len(tags) == 0:
@@ -159,6 +161,14 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 release_github_apk = "https://github.com" + tags[0].get('href')
             except:
                 release_github_apk = -1
+        tags = elem.cssselect('.release-header h1.release-title a')
+        if len(tags) == 0:
+            release_github_version = -1
+        else:
+            try:
+                release_github_version = tags[0].text
+            except:
+                release_github_version = -1
 
         # scrap contributors from website
         elem = html.fromstring(contributors_data)
@@ -182,7 +192,13 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 "translations": int(translations["count"]),
             },
             "flavors": {
-                "stable": assemble_release_data(stable_data, release_github_apk),
+                "stable": {
+                    "f-droid": assemble_release_data(stable_data),
+                    "github": {
+                        "version": release_github_version,
+                        "apk": release_github_apk,
+                    }
+                }
             }
         }
 
