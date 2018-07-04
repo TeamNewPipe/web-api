@@ -198,7 +198,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
                         "apk": release_github_apk,
                     }
                 },
-                "f-droid":  {
+                "fdroid":  {
                     "stable": assemble_release_data(stable_data),
                 }
             }
