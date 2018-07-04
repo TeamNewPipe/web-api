@@ -151,7 +151,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         repo = json.loads(repo_data)
 
-        # scrap latest GitHub version and apk from website
+        # scrape latest GitHub version and apk from website
         elem = html.fromstring(release_github_data)
         tags = elem.cssselect('.release-body li.d-block a[href$=".apk"]')
         if len(tags) == 0:
@@ -170,7 +170,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
             except:
                 release_github_version = -1
 
-        # scrap contributors from website
+        # scrape contributors from website
         elem = html.fromstring(contributors_data)
         tags = elem.cssselect(".numbers-summary a[href$=contributors] .num")
         if len(tags) != 1:
@@ -192,12 +192,14 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 "translations": int(translations["count"]),
             },
             "flavors": {
-                "stable": {
-                    "f-droid": assemble_release_data(stable_data),
-                    "github": {
+                "github": {
+                    "stable": {
                         "version": release_github_version,
                         "apk": release_github_apk,
                     }
+                },
+                "f-droid":  {
+                    "stable": assemble_release_data(stable_data),
                 }
             }
         }
