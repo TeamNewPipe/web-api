@@ -103,6 +103,8 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         repo_url = "https://api.github.com/repos/TeamNewPipe/NewPipe"
 
+        release_github_url = "https://github.com/TeamNewPipe/NewPipe/releases/"
+
         contributors_url = "https://github.com/TeamNewPipe/NewPipe"
 
         translations_url = "https://hosted.weblate.org/api/components/" \
@@ -121,6 +123,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
         responses = yield tornado.gen.multi((
             fetch(make_request(repo_url)),
             fetch(make_request(stable_url)),
+            fetch(make_request(release_github_url)),
             fetch(make_request(contributors_url)),
             fetch(make_request(translations_url)),
         ))
@@ -130,21 +133,34 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 self.__class__._last_failed_request = datetime.now()
                 return False
 
-        repo_data, stable_data, \
+        repo_data, stable_data, release_github_data, \
         contributors_data, translations_data = [x.body for x in responses]
 
-        def assemble_release_data(data: str):
-            if isinstance(data, bytes):
-                data = data.decode()
+        def assemble_release_data(version_data: str, github_apk: str):
+            if isinstance(version_data, bytes):
+                version_data = version_data.decode()
 
-            versions = re.findall("commit=(.*)", data)
+            versions = re.findall("commit=(.*)", version_data)
 
             return {
                 "version": versions[-1],
+                "github_apk": github_apk,
             }
 
         repo = json.loads(repo_data)
 
+        # scrap latest GitHub apk from website
+        elem = html.fromstring(release_github_data)
+        tags = elem.cssselect('.release-body li.d-block a[href$=".apk"]')
+        if len(tags) == 0:
+            release_github_apk = -1
+        else:
+            try:
+                release_github_apk = "https://github.com" + tags[0].get('href')
+            except:
+                release_github_apk = -1
+
+        # scrap contributors from website
         elem = html.fromstring(contributors_data)
         tags = elem.cssselect(".numbers-summary a[href$=contributors] .num")
         if len(tags) != 1:
@@ -166,7 +182,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 "translations": int(translations["count"]),
             },
             "flavors": {
-                "stable": assemble_release_data(stable_data),
+                "stable": assemble_release_data(stable_data, release_github_apk),
             }
         }
 
