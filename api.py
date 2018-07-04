@@ -145,7 +145,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
             version_code = version_codes[-1].split(",")[-1]
             return {
                 "version": versions[-1],
-                "version_code": version_code,
+                "version_code": int(version_code),
                 "apk": "https://f-droid.org/repo/org.schabi.newpipe_" + version_code + ".apk",
             }
 
