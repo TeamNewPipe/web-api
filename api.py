@@ -162,7 +162,10 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 release_github_apk = "https://github.com" + tags[0].get('href')
             except:
                 release_github_apk = -1
-        tags = elem.cssselect('.release-header h1.release-title a')
+
+        # version
+        tags = elem.cssselect(
+            ".release > .release-meta > .tag-references a.css-truncate > span.css-truncate-target")
         if len(tags) == 0:
             release_github_version = -1
         else:
