@@ -151,7 +151,8 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         repo = json.loads(repo_data)
 
-        # scrape latest GitHub version and apk from website
+        # scrape latest GitHub apk, version and version code from website
+        # apk
         elem = html.fromstring(release_github_data)
         tags = elem.cssselect('.release-body li.d-block a[href$=".apk"]')
         if len(tags) == 0:
@@ -161,7 +162,10 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 release_github_apk = "https://github.com" + tags[0].get('href')
             except:
                 release_github_apk = -1
-        tags = elem.cssselect('.release-header h1.release-title a')
+
+        # version
+        tags = elem.cssselect(
+            ".release > .release-meta > .tag-references a.css-truncate > span.css-truncate-target")
         if len(tags) == 0:
             release_github_version = -1
         else:
@@ -169,6 +173,29 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 release_github_version = tags[0].text
             except:
                 release_github_version = -1
+
+        # version code
+        # get git hash from release page
+        tags = elem.cssselect(".release > .release-meta > .tag-references a code")
+        if len(tags) == 0:
+            release_github_version_code = -1
+        else:
+            try:
+                release_github_hash = tags[0].text
+
+                # use git hash to get the matching build.gradle file
+                response = yield tornado.gen.multi((
+                    fetch(make_request("https://raw.githubusercontent.com/TeamNewPipe/NewPipe/" +
+                                       release_github_hash + "/app/build.gradle")),
+                ))
+                gradle_file_data = [x.body for x in response]
+                gradle_file_data = gradle_file_data[0]
+                if isinstance(gradle_file_data, bytes):
+                    gradle_file_data = gradle_file_data.decode()
+                version_codes_g = re.findall("versionCode(.*)", gradle_file_data)
+                release_github_version_code = version_codes_g[0].split(" ")[-1]
+            except:
+                release_github_version_code = -1
 
         # scrape contributors from website
         elem = html.fromstring(contributors_data)
@@ -195,10 +222,11 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 "github": {
                     "stable": {
                         "version": release_github_version,
+                        "version_code": int(release_github_version_code),
                         "apk": release_github_apk,
                     }
                 },
-                "fdroid":  {
+                "fdroid": {
                     "stable": assemble_release_data(stable_data),
                 }
             }
