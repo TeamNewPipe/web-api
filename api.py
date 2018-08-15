@@ -154,7 +154,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
         # scrape latest GitHub apk, version and version code from website
         # apk
         elem = html.fromstring(release_github_data)
-        tags = elem.cssselect('.release-body li.d-block a[href$=".apk"]')
+        tags = elem.cssselect('.release-main-section li.d-block a[href$=".apk"]')
         if len(tags) == 0:
             release_github_apk = -1
         else:
@@ -165,7 +165,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         # version
         tags = elem.cssselect(
-            ".release > .release-meta > .tag-references a.css-truncate > span.css-truncate-target")
+            ".release .float-left ul li a.css-truncate > span.css-truncate-target")
         if len(tags) == 0:
             release_github_version = -1
         else:
@@ -176,7 +176,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         # version code
         # get git hash from release page
-        tags = elem.cssselect(".release > .release-meta > .tag-references a code")
+        tags = elem.cssselect(".release .float-left ul li a code")
         if len(tags) == 0:
             release_github_version_code = -1
         else:
