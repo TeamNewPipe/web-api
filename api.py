@@ -13,6 +13,8 @@ import tornado.options
 import tornado.web
 
 from datetime import datetime, timedelta
+
+import yaml
 from lxml import html
 from tornado import gen
 
@@ -98,7 +100,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         self.logger.log(logging.INFO, "Fetching latest release from GitHub")
 
-        releases_url_template = "https://gitlab.com/fdroid/fdroiddata/raw/master/metadata/{}.txt"
+        releases_url_template = "https://gitlab.com/fdroid/fdroiddata/raw/master/metadata/{}.yml"
         stable_url = releases_url_template.format("org.schabi.newpipe")
 
         repo_url = "https://api.github.com/repos/TeamNewPipe/NewPipe"
@@ -140,13 +142,18 @@ class DataJsonHandler(tornado.web.RequestHandler):
             if isinstance(version_data, bytes):
                 version_data = version_data.decode()
 
-            versions = re.findall("commit=(.*)", version_data)
-            version_codes = re.findall("Build:(.*)", version_data)
-            version_code = version_codes[-1].split(",")[-1]
+            data = yaml.load(version_data)
+            latest_version = data["Builds"][-1]
+
+            version = latest_version["versionName"]
+            version_code = latest_version["versionCode"]
+
+            apk_url = "https://f-droid.org/repo/org.schabi.newpipe_{}.apk".format(version_code)
+
             return {
-                "version": versions[-1],
-                "version_code": int(version_code),
-                "apk": "https://f-droid.org/repo/org.schabi.newpipe_" + version_code + ".apk",
+                "version": version,
+                "version_code": version_code,
+                "apk": apk_url,
             }
 
         repo = json.loads(repo_data)
