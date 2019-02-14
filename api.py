@@ -28,16 +28,13 @@ def fetch(url: str):
         "User-Agent": ""
     })
     http_client = tornado.httpclient.AsyncHTTPClient()
-    return http_client.fetch(request, raise_error=False)
+    return http_client.fetch(request, raise_error=True)
 
 
 @gen.coroutine
 def github_parser(repo_name: str):
     url = "https://github.com/TeamNewPipe/{}/releases/".format(repo_name)
-    response = yield fetch(url)
-    if response.error:
-        return None
-    html_string = response.body
+    html_string = (yield fetch(url)).body
     document = html.fromstring(html_string)
 
     @gen.coroutine
@@ -51,8 +48,7 @@ def github_parser(repo_name: str):
     def version_code_get() -> int:
         tags = document.cssselect(".release .float-left ul li a code")
         repo_hash = tags[0].text
-        gradle_response = yield fetch(gradle_template.format(repo_name, repo_hash))
-        gradle_file_data = gradle_response.body
+        gradle_file_data = (yield fetch(gradle_template.format(repo_name, repo_hash))).body
         if isinstance(gradle_file_data, bytes):
             gradle_file_data = gradle_file_data.decode()
         version_codes = re.findall("versionCode(.*)", gradle_file_data)
@@ -63,34 +59,24 @@ def github_parser(repo_name: str):
         tags = document.cssselect('.release-main-section li.d-block a[href$=".apk"]')
         return "https://github.com" + tags[0].get("href")
 
-    try:
-        return {
-            "stable": (yield gen.multi({
-                "version": version_get(),
-                "version_code": version_code_get(),
-                "apk": apk_get(),
-            }, quiet_exceptions=(IndexError)))
-        }
-    except:
-        return None
+    return {
+        "stable": (yield gen.multi({
+            "version": version_get(),
+            "version_code": version_code_get(),
+            "apk": apk_get(),
+        }))
+    }
 
 
 @gen.coroutine
 def fdroid_parser(package_name: str):
     template = "https://gitlab.com/fdroid/fdroiddata/raw/master/metadata/{}.yml"
     url = template.format(package_name)
-    response = yield fetch(url)
-    if response.error:
-        return None
-    version_data = response.body
+    version_data = (yield fetch(url)).body
     if isinstance(version_data, bytes):
         version_data = version_data.decode()
 
-    try:
-        data = yaml.load(version_data)
-    except:
-        return None
-
+    data = yaml.load(version_data)
     latest_version = data["Builds"][-1]
     version = latest_version["versionName"]
     version_code = latest_version["versionCode"]
@@ -126,13 +112,7 @@ def assemble_stats():
 
     document = html.fromstring(contributors_data)
     tags = document.cssselect(".numbers-summary a[href$=contributors] .num")
-    if len(tags) != 1:
-        contributors = -1
-    else:
-        try:
-            contributors = int(tags[0].text)
-        except:
-            contributors = -1
+    contributors = int(tags[0].text)
 
     return {
         "stargazers": repo["stargazers_count"],
@@ -150,15 +130,6 @@ def assemble_flavors():
         "github_legacy": github_parser("NewPipe-legacy"),
         "fdroid_legacy": fdroid_parser("org.schabi.newpipelegacy"),
     })
-
-
-def clear_nones(data: dict) -> dict:
-    for key, value in list(data.items()):
-        if isinstance(value, dict):
-            clear_nones(value)
-        elif value is None:
-            data.pop(key)
-    return data
 
 
 class DataJsonHandler(tornado.web.RequestHandler):
@@ -237,10 +208,27 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         self.logger.log(logging.INFO, "Fetching latest release from GitHub")
 
-        data = clear_nones((yield gen.multi({
-            "stats": assemble_stats(),
-            "flavors": assemble_flavors()
-        })))
+        success = False
+        try:
+            data = yield gen.multi({
+                "stats": assemble_stats(),
+                "flavors": assemble_flavors()
+            })
+            success = True
+        except tornado.httpclient.HTTPError as error:
+            response = error.response
+            self.logger.log(
+                logging.ERROR,
+                "API error: {} -> {} ({})".format(response.effective_url, response.error, response.body),
+            )
+        except Exception as error:
+            self.logger.log(logging.ERROR, error)
+
+        if not success:
+            self.__class__._last_failed_request = datetime.now()
+            self.__class__._lock.release()
+            self.send_error(500)
+            return False
 
         self.update_cache(data)
         self.__class__._lock.release()
