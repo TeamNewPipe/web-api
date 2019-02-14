@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-import functools
 import json
 import logging
 import random
@@ -21,12 +20,150 @@ from tornado import gen
 
 def random_string(length=20):
     alphabet = string.ascii_letters + string.digits + "_/-.;:#+*?()$[]!"
-    return "".join((random.choice(alphabet) for i in range(length)))
+    return "".join((random.choice(alphabet) for _ in range(length)))
+
+
+def fetch(url: str):
+    request = tornado.httpclient.HTTPRequest(url, headers={
+        "User-Agent": ""
+    })
+    http_client = tornado.httpclient.AsyncHTTPClient()
+    return http_client.fetch(request, raise_error=False)
+
+
+@gen.coroutine
+def github_parser(repo_name: str):
+    url = "https://github.com/TeamNewPipe/{}/releases/".format(repo_name)
+    response = yield fetch(url)
+    if response.error:
+        return None
+    html_string = response.body
+    document = html.fromstring(html_string)
+
+    @gen.coroutine
+    def version_get() -> str:
+        tags = document.cssselect(".release .float-left ul li a.css-truncate > span.css-truncate-target")
+        return tags[0].text
+
+    gradle_template = "https://raw.githubusercontent.com/TeamNewPipe/{}/{}/app/build.gradle"
+
+    @gen.coroutine
+    def version_code_get() -> int:
+        tags = document.cssselect(".release .float-left ul li a code")
+        repo_hash = tags[0].text
+        gradle_response = yield fetch(gradle_template.format(repo_name, repo_hash))
+        gradle_file_data = gradle_response.body
+        if isinstance(gradle_file_data, bytes):
+            gradle_file_data = gradle_file_data.decode()
+        version_codes = re.findall("versionCode(.*)", gradle_file_data)
+        return int(version_codes[0].split(" ")[-1])
+
+    @gen.coroutine
+    def apk_get() -> str:
+        tags = document.cssselect('.release-main-section li.d-block a[href$=".apk"]')
+        return "https://github.com" + tags[0].get("href")
+
+    try:
+        return {
+            "stable": (yield gen.multi({
+                "version": version_get(),
+                "version_code": version_code_get(),
+                "apk": apk_get(),
+            }, quiet_exceptions=(IndexError)))
+        }
+    except:
+        return None
+
+
+@gen.coroutine
+def fdroid_parser(package_name: str):
+    template = "https://gitlab.com/fdroid/fdroiddata/raw/master/metadata/{}.yml"
+    url = template.format(package_name)
+    response = yield fetch(url)
+    if response.error:
+        return None
+    version_data = response.body
+    if isinstance(version_data, bytes):
+        version_data = version_data.decode()
+
+    try:
+        data = yaml.load(version_data)
+    except:
+        return None
+
+    latest_version = data["Builds"][-1]
+    version = latest_version["versionName"]
+    version_code = latest_version["versionCode"]
+
+    apk_template = "https://f-droid.org/repo/{}_{}.apk"
+    apk_url = apk_template.format(package_name, version_code)
+
+    return {
+        "stable": {
+            "version": version,
+            "version_code": version_code,
+            "apk": apk_url,
+        }
+    }
+
+
+@gen.coroutine
+def assemble_stats():
+    repo_url = "https://api.github.com/repos/TeamNewPipe/NewPipe"
+    contributors_url = "https://github.com/TeamNewPipe/NewPipe"
+    translations_url = "https://hosted.weblate.org/api/components/newpipe/" \
+                       "strings/translations/"
+    repo_data, contributors_data, translations_data = \
+        [x.body for x in (yield gen.multi((
+            fetch(repo_url),
+            fetch(contributors_url),
+            fetch(translations_url),
+        )))]
+
+    repo = json.loads(repo_data)
+
+    translations = json.loads(translations_data)
+
+    document = html.fromstring(contributors_data)
+    tags = document.cssselect(".numbers-summary a[href$=contributors] .num")
+    if len(tags) != 1:
+        contributors = -1
+    else:
+        try:
+            contributors = int(tags[0].text)
+        except:
+            contributors = -1
+
+    return {
+        "stargazers": repo["stargazers_count"],
+        "watchers": repo["subscribers_count"],
+        "forks": repo["forks_count"],
+        "contributors": contributors,
+        "translations": int(translations["count"]),
+    }
+
+
+def assemble_flavors():
+    return gen.multi({
+        "github": github_parser("NewPipe"),
+        "fdroid": fdroid_parser("org.schabi.newpipe"),
+        "github_legacy": github_parser("NewPipe-legacy"),
+        "fdroid_legacy": fdroid_parser("org.schabi.newpipelegacy"),
+    })
+
+
+def clear_nones(data: dict) -> dict:
+    for key, value in list(data.items()):
+        if isinstance(value, dict):
+            clear_nones(value)
+        elif value is None:
+            data.pop(key)
+    return data
 
 
 class DataJsonHandler(tornado.web.RequestHandler):
-    # 1 hour as a timeout is neither too outdated nor requires bothering
-    # GitHub too often
+    # 1 hour as a timeout is neither too outdated nor requires bothering GitHub
+    # too often
     _timeout = timedelta(hours=1)
 
     # initialize with datetime that is outdated for sure
@@ -75,7 +212,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
             self.write_error(500)
 
         elif self.is_request_outdated():
-            yield self.fetch_data_and_assemble_response()
+            yield self.assemble_fresh_response()
 
         else:
             self.add_default_headers()
@@ -95,157 +232,18 @@ class DataJsonHandler(tornado.web.RequestHandler):
         return True
 
     @gen.coroutine
-    def fetch_data_and_assemble_response(self):
+    def assemble_fresh_response(self):
         yield self.__class__._lock.acquire()
 
         self.logger.log(logging.INFO, "Fetching latest release from GitHub")
 
-        releases_url_template = "https://gitlab.com/fdroid/fdroiddata/raw/master/metadata/{}.yml"
-        stable_url = releases_url_template.format("org.schabi.newpipe")
+        data = clear_nones((yield gen.multi({
+            "stats": assemble_stats(),
+            "flavors": assemble_flavors()
+        })))
 
-        repo_url = "https://api.github.com/repos/TeamNewPipe/NewPipe"
-
-        release_github_url = "https://github.com/TeamNewPipe/NewPipe/releases/"
-
-        contributors_url = "https://github.com/TeamNewPipe/NewPipe"
-
-        translations_url = "https://hosted.weblate.org/api/components/" \
-                           "newpipe/strings/translations/"
-
-        def make_request(url: str):
-            kwargs = dict(headers={
-                "User-Agent": ""
-            })
-            return tornado.httpclient.HTTPRequest(url, **kwargs)
-
-        def fetch(request: tornado.httpclient.HTTPRequest):
-            http_client = tornado.httpclient.AsyncHTTPClient()
-            return http_client.fetch(request, raise_error=False)
-
-        responses = yield tornado.gen.multi((
-            fetch(make_request(repo_url)),
-            fetch(make_request(stable_url)),
-            fetch(make_request(release_github_url)),
-            fetch(make_request(contributors_url)),
-            fetch(make_request(translations_url)),
-        ))
-
-        for response in responses:
-            if not self.validate_response(response):
-                self.__class__._last_failed_request = datetime.now()
-                return False
-
-        repo_data, stable_data, release_github_data, \
-        contributors_data, translations_data = [x.body for x in responses]
-
-        def assemble_release_data(version_data: str):
-            if isinstance(version_data, bytes):
-                version_data = version_data.decode()
-
-            data = yaml.load(version_data)
-            latest_version = data["Builds"][-1]
-
-            version = latest_version["versionName"]
-            version_code = latest_version["versionCode"]
-
-            apk_url = "https://f-droid.org/repo/org.schabi.newpipe_{}.apk".format(version_code)
-
-            return {
-                "version": version,
-                "version_code": version_code,
-                "apk": apk_url,
-            }
-
-        repo = json.loads(repo_data)
-
-        # scrape latest GitHub apk, version and version code from website
-        # apk
-        elem = html.fromstring(release_github_data)
-        tags = elem.cssselect('.release-main-section li.d-block a[href$=".apk"]')
-        if len(tags) == 0:
-            release_github_apk = -1
-        else:
-            try:
-                release_github_apk = "https://github.com" + tags[0].get('href')
-            except:
-                release_github_apk = -1
-
-        # version
-        tags = elem.cssselect(
-            ".release .float-left ul li a.css-truncate > span.css-truncate-target")
-        if len(tags) == 0:
-            release_github_version = -1
-        else:
-            try:
-                release_github_version = tags[0].text
-            except:
-                release_github_version = -1
-
-        # version code
-        # get git hash from release page
-        tags = elem.cssselect(".release .float-left ul li a code")
-        if len(tags) == 0:
-            release_github_version_code = -1
-        else:
-            try:
-                release_github_hash = tags[0].text
-
-                # use git hash to get the matching build.gradle file
-                response = yield tornado.gen.multi((
-                    fetch(make_request("https://raw.githubusercontent.com/TeamNewPipe/NewPipe/" +
-                                       release_github_hash + "/app/build.gradle")),
-                ))
-                gradle_file_data = [x.body for x in response]
-                gradle_file_data = gradle_file_data[0]
-                if isinstance(gradle_file_data, bytes):
-                    gradle_file_data = gradle_file_data.decode()
-                version_codes_g = re.findall("versionCode(.*)", gradle_file_data)
-                release_github_version_code = version_codes_g[0].split(" ")[-1]
-            except:
-                release_github_version_code = -1
-
-        # scrape contributors from website
-        elem = html.fromstring(contributors_data)
-        tags = elem.cssselect(".numbers-summary a[href$=contributors] .num")
-        if len(tags) != 1:
-            contributors_count = -1
-        else:
-            try:
-                contributors_count = int(tags[0].text)
-            except:
-                contributors_count = -1
-
-        translations = json.loads(translations_data)
-
-        data = {
-            "stats": {
-                "stargazers": repo["stargazers_count"],
-                "watchers": repo["subscribers_count"],
-                "forks": repo["forks_count"],
-                "contributors": contributors_count,
-                "translations": int(translations["count"]),
-            },
-            "flavors": {
-                "github": {
-                    "stable": {
-                        "version": release_github_version,
-                        "version_code": int(release_github_version_code),
-                        "apk": release_github_apk,
-                    }
-                },
-                "fdroid": {
-                    "stable": assemble_release_data(stable_data),
-                }
-            }
-        }
-
-        # update cache
         self.update_cache(data)
-
-        # once cache is updated, release lock
         self.__class__._lock.release()
-
-        # finish response
         self.add_default_headers()
         self.write(data)
         self.finish()
@@ -255,6 +253,9 @@ class DataJsonHandler(tornado.web.RequestHandler):
         cls._cached_response = data
         now = datetime.now()
         cls._last_request = now
+
+    def data_received(self, chunk):
+        pass
 
 
 def make_app():
