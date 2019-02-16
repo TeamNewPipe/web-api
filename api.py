@@ -32,51 +32,55 @@ def fetch(url: str):
 
 
 @gen.coroutine
-def github_parser(repo_name: str):
+def get_github_flavor(repo_name: str):
     url = "https://github.com/TeamNewPipe/{}/releases/".format(repo_name)
     html_string = (yield fetch(url)).body
     document = html.fromstring(html_string)
 
     @gen.coroutine
-    def version_get() -> str:
+    def get_version_str() -> str:
         tags = document.cssselect(".release .float-left ul li a.css-truncate > span.css-truncate-target")
         return tags[0].text
 
     gradle_template = "https://raw.githubusercontent.com/TeamNewPipe/{}/{}/app/build.gradle"
 
     @gen.coroutine
-    def version_code_get() -> int:
+    def get_version_code() -> int:
         tags = document.cssselect(".release .float-left ul li a code")
         repo_hash = tags[0].text
+
         gradle_file_data = (yield fetch(gradle_template.format(repo_name, repo_hash))).body
         if isinstance(gradle_file_data, bytes):
             gradle_file_data = gradle_file_data.decode()
+
         version_codes = re.findall("versionCode(.*)", gradle_file_data)
         return int(version_codes[0].split(" ")[-1])
 
     @gen.coroutine
-    def apk_get() -> str:
+    def get_apk_url() -> str:
         tags = document.cssselect('.release-main-section li.d-block a[href$=".apk"]')
         return "https://github.com" + tags[0].get("href")
 
     return {
         "stable": (yield gen.multi({
-            "version": version_get(),
-            "version_code": version_code_get(),
-            "apk": apk_get(),
+            "version": get_version_str(),
+            "version_code": get_version_code(),
+            "apk": get_apk_url(),
         }))
     }
 
 
 @gen.coroutine
-def fdroid_parser(package_name: str):
+def get_fdroid_flavor(package_name: str):
     template = "https://gitlab.com/fdroid/fdroiddata/raw/master/metadata/{}.yml"
     url = template.format(package_name)
+
     version_data = (yield fetch(url)).body
     if isinstance(version_data, bytes):
         version_data = version_data.decode()
 
     data = yaml.load(version_data)
+
     latest_version = data["Builds"][-1]
     version = latest_version["versionName"]
     version_code = latest_version["versionCode"]
@@ -125,10 +129,10 @@ def assemble_stats():
 
 def assemble_flavors():
     return gen.multi({
-        "github": github_parser("NewPipe"),
-        "fdroid": fdroid_parser("org.schabi.newpipe"),
-        "github_legacy": github_parser("NewPipe-legacy"),
-        "fdroid_legacy": fdroid_parser("org.schabi.newpipelegacy"),
+        "github": get_github_flavor("NewPipe"),
+        "fdroid": get_fdroid_flavor("org.schabi.newpipe"),
+        "github_legacy": get_github_flavor("NewPipe-legacy"),
+        "fdroid_legacy": get_fdroid_flavor("org.schabi.newpipelegacy"),
     })
 
 
@@ -208,13 +212,14 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         self.logger.log(logging.INFO, "Fetching latest release from GitHub")
 
-        success = False
+        data = None
+        failure = True
         try:
             data = yield gen.multi({
                 "stats": assemble_stats(),
                 "flavors": assemble_flavors()
             })
-            success = True
+            failure = False
         except tornado.httpclient.HTTPError as error:
             response = error.response
             self.logger.log(
@@ -224,7 +229,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
         except Exception as error:
             self.logger.log(logging.ERROR, error)
 
-        if not success:
+        if failure:
             self.__class__._last_failed_request = datetime.now()
             self.__class__._lock.release()
             self.send_error(500)
