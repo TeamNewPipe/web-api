@@ -193,19 +193,6 @@ class DataJsonHandler(tornado.web.RequestHandler):
             self.add_default_headers()
             self.write(self._cached_response)
 
-    def validate_response(self, response: tornado.httpclient.HTTPResponse):
-        if response.error:
-            # release lock in case of errors
-            self.__class__._lock.release()
-            self.logger.log(
-                logging.ERROR,
-                "GitHub API error: {} -> {} ({})".format(response.effective_url, response.error, response.body),
-            )
-            self.send_error(500)
-            return False
-
-        return True
-
     @gen.coroutine
     def assemble_fresh_response(self):
         yield self.__class__._lock.acquire()
