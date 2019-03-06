@@ -58,7 +58,7 @@ def get_github_flavor(repo_name: str):
 
     @gen.coroutine
     def get_apk_url() -> str:
-        tags = document.cssselect('.release-main-section li.d-block a[href$=".apk"]')
+        tags = document.cssselect('.release-main-section details a[href$=".apk"]')
         return "https://github.com" + tags[0].get("href")
 
     return {
