@@ -18,7 +18,7 @@ import yaml
 from lxml import html
 from tornado import gen
 
-from raven import AsyncSentryClient, SentryMixin
+from raven.contrib.tornado import AsyncSentryClient, SentryMixin
 
 
 def random_string(length=20):
