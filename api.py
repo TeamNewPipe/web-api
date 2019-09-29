@@ -234,9 +234,6 @@ class DataJsonHandler(tornado.web.RequestHandler):
         now = datetime.now()
         cls._last_request = now
 
-    def data_received(self, chunk):
-        pass
-
 
 def make_app():
     return tornado.web.Application([
