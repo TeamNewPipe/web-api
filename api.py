@@ -221,9 +221,8 @@ class DataJsonHandler(tornado.web.RequestHandler):
                 "API error: {} -> {} ({})".format(response.effective_url, response.error, response.body),
             )
 
-        except Exception as error:
-            self.logger.log(logging.ERROR, "Unknown error occured, see next line")
-            self.logger.log(logging.ERROR, error)
+        except:
+            self.logger.exception("Unknown error occured, see next line")
 
         else:
             failure = False
