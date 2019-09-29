@@ -140,6 +140,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
     # 1 hour as a timeout is neither too outdated nor requires bothering GitHub
     # too often
     _timeout = timedelta(hours=1)
+    _error_timeout = timedelta(minutes=6)
 
     # initialize with datetime that is outdated for sure
     _last_request = (datetime.now() - 2 * _timeout)
@@ -180,7 +181,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
         now = datetime.now()
 
         if self.__class__._last_failed_request is not None and \
-                (now - self.__class__._last_failed_request) < self.__class__._timeout:
+                (now - self.__class__._last_failed_request) < self.__class__._error_timeout:
             self.logger.log(logging.INFO,
                             "Request failed recently, waiting for timeout")
             self.add_default_headers()
