@@ -201,21 +201,29 @@ class DataJsonHandler(tornado.web.RequestHandler):
         self.logger.log(logging.INFO, "Fetching latest release from GitHub")
 
         data = None
+
+        # prove me wrong!
         failure = True
+
         try:
             data = yield gen.multi({
                 "stats": assemble_stats(),
                 "flavors": assemble_flavors()
             })
-            failure = False
+
         except tornado.httpclient.HTTPError as error:
             response = error.response
             self.logger.log(
                 logging.ERROR,
                 "API error: {} -> {} ({})".format(response.effective_url, response.error, response.body),
             )
+
         except Exception as error:
+            self.logger.log(logging.ERROR, "Unknown error occured, see next line")
             self.logger.log(logging.ERROR, error)
+
+        else:
+            failure = False
 
         if failure:
             self.__class__._last_failed_request = datetime.now()
