@@ -110,9 +110,9 @@ def assemble_stats():
             fetch(translations_url),
         )))]
 
-    repo = json.loads(repo_data)
+    repo = json.loads(repo_data.decode())
 
-    translations = json.loads(translations_data)
+    translations = json.loads(translations_data.decode())
 
     document = html.fromstring(contributors_data)
     tags = document.cssselect(".numbers-summary a[href$=contributors] .num")
