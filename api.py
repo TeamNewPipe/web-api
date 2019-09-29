@@ -234,7 +234,6 @@ class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
 
         if failure:
             self.__class__._last_failed_request = datetime.now()
-            self.__class__._lock.release()
             self.send_error(500)
             return False
 
