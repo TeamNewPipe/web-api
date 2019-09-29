@@ -13,11 +13,11 @@ RUN pip install -r requirements.txt
 
 USER app
 
-COPY api.py /
-
 HEALTHCHECK --interval=5m --timeout=3s \
     CMD curl -f http://localhost:3000/data.json || exit 1
 
 EXPOSE 3000
 
 ENTRYPOINT ["python", "api.py"]
+
+COPY api.py /
