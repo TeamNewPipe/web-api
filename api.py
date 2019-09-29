@@ -259,6 +259,8 @@ def make_app():
     if sentry_url is not None:
         print("Setting up Sentry integration")
         app.sentry_client = AsyncSentryClient(sentry_url)
+    else:
+        app.sentry_client = AsyncSentryClient()
 
     return app
 
