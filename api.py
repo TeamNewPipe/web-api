@@ -184,7 +184,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
             self.logger.log(logging.INFO,
                             "Request failed recently, waiting for timeout")
             self.add_default_headers()
-            self.write_error(500)
+            self.send_error(500)
 
         elif self.is_request_outdated():
             yield self.assemble_fresh_response()
