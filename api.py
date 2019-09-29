@@ -186,18 +186,21 @@ class DataJsonHandler(tornado.web.RequestHandler):
                             "Request failed recently, waiting for timeout")
             self.add_default_headers()
             self.send_error(500)
+            return
 
-        elif self.is_request_outdated():
+        yield self.__class__._lock.acquire()
+
+        if self.is_request_outdated():
             yield self.assemble_fresh_response()
 
         else:
             self.add_default_headers()
             self.write(self._cached_response)
 
+        yield self.__class__._lock.release()
+
     @gen.coroutine
     def assemble_fresh_response(self):
-        yield self.__class__._lock.acquire()
-
         self.logger.log(logging.INFO, "Fetching latest release from GitHub")
 
         data = None
@@ -232,7 +235,6 @@ class DataJsonHandler(tornado.web.RequestHandler):
             return False
 
         self.update_cache(data)
-        self.__class__._lock.release()
         self.add_default_headers()
         self.write(data)
         self.finish()
