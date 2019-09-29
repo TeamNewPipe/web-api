@@ -79,7 +79,7 @@ def get_fdroid_flavor(package_name: str):
     if isinstance(version_data, bytes):
         version_data = version_data.decode()
 
-    data = yaml.load(version_data)
+    data = yaml.safe_load(version_data)
 
     latest_version = data["Builds"][-1]
     version = latest_version["versionName"]
