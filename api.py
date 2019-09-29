@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import random
 import re
 import string
@@ -16,6 +17,8 @@ from datetime import datetime, timedelta
 import yaml
 from lxml import html
 from tornado import gen
+
+from raven import AsyncSentryClient, SentryMixin
 
 
 def random_string(length=20):
@@ -136,7 +139,7 @@ def assemble_flavors():
     })
 
 
-class DataJsonHandler(tornado.web.RequestHandler):
+class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
     # 1 hour as a timeout is neither too outdated nor requires bothering GitHub
     # too often
     _timeout = timedelta(hours=1)
@@ -215,6 +218,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
             })
 
         except tornado.httpclient.HTTPError as error:
+            yield gen.Task(self.captureException, "API error")
             response = error.response
             self.logger.log(
                 logging.ERROR,
@@ -223,6 +227,7 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
         except:
             self.logger.exception("Unknown error occured, see next line")
+            yield gen.Task(self.captureException, exc_info=True)
 
         else:
             failure = False
@@ -246,9 +251,17 @@ class DataJsonHandler(tornado.web.RequestHandler):
 
 
 def make_app():
-    return tornado.web.Application([
+    app = tornado.web.Application([
         (r"/data.json", DataJsonHandler),
     ])
+
+    sentry_url = os.environ.get("SENTRY_URL", None)
+
+    if sentry_url is not None:
+        print("Setting up Sentry integration")
+        app.sentry_client = AsyncSentryClient(sentry_url)
+
+    return app
 
 
 if __name__ == "__main__":
