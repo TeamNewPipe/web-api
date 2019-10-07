@@ -100,36 +100,6 @@ def get_fdroid_flavor(package_name: str):
     }
 
 
-@gen.coroutine
-def assemble_stats():
-    repo_url = "https://api.github.com/repos/TeamNewPipe/NewPipe"
-    contributors_url = "https://github.com/TeamNewPipe/NewPipe"
-    translations_url = "https://hosted.weblate.org/api/components/newpipe/" \
-                       "strings/translations/"
-    repo_data, contributors_data, translations_data = \
-        [x.body for x in (yield gen.multi((
-            fetch(repo_url),
-            fetch(contributors_url),
-            fetch(translations_url),
-        )))]
-
-    repo = json.loads(repo_data.decode())
-
-    translations = json.loads(translations_data.decode())
-
-    document = html.fromstring(contributors_data)
-    tags = document.cssselect(".numbers-summary a[href$=contributors] .num")
-    contributors = int(tags[0].text)
-
-    return {
-        "stargazers": repo["stargazers_count"],
-        "watchers": repo["subscribers_count"],
-        "forks": repo["forks_count"],
-        "contributors": contributors,
-        "translations": int(translations["count"]),
-    }
-
-
 def assemble_flavors():
     return gen.multi({
         "github": get_github_flavor("NewPipe"),
@@ -203,6 +173,51 @@ class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
         yield self.__class__._lock.release()
 
     @gen.coroutine
+    def assemble_stats(self):
+        repo_url = "https://api.github.com/repos/TeamNewPipe/NewPipe"
+        contributors_url = "https://github.com/TeamNewPipe/NewPipe"
+        translations_url = "https://hosted.weblate.org/api/components/newpipe/" \
+                           "strings/translations/"
+
+        repo_data, contributors_data, translations_data = \
+            [x.body for x in (yield gen.multi((
+                fetch(repo_url),
+                fetch(contributors_url),
+                fetch(translations_url),
+            )))]
+
+        repo = json.loads(repo_data.decode())
+
+        translations = json.loads(translations_data.decode())
+
+        # no idea why, but sometimes we receive different responses from GitHub
+        # might be some annoying A/B testing
+        # therefore we make this more fault-tolerant by sending a negative value if we can't fetch the data from GitHub
+        document = html.fromstring(contributors_data)
+        tags = document.cssselect(".numbers-summary a[href$=contributors] .num")
+
+        try:
+            contributors = int(tags[0].text)
+
+        except:
+            # log exception to sentry
+            self.captureException(exc_info=True)
+
+            # log entire response body to file
+            with open("/tmp/failed-contributors-response.{}.txt".format(datetime.now().isoformat()), "wb") as f:
+                f.write(contributors_data)
+
+            contributors = -1
+
+        return {
+            "stargazers": repo["stargazers_count"],
+            "watchers": repo["subscribers_count"],
+            "forks": repo["forks_count"],
+            "contributors": contributors,
+            "translations": int(translations["count"]),
+        }
+
+    @gen.coroutine
     def assemble_fresh_response(self):
         self.logger.log(logging.INFO, "Fetching latest release from GitHub")
 
@@ -213,7 +228,7 @@ class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
 
         try:
             data = yield gen.multi({
-                "stats": assemble_stats(),
+                "stats": self.assemble_stats(),
                 "flavors": assemble_flavors()
             })
 
