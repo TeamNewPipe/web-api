@@ -150,25 +150,21 @@ class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
 
     @gen.coroutine
     def get(self):
-        # ensure that timeout is respected
-        now = datetime.now()
 
-        if self.__class__._last_failed_request is not None and \
-                (now - self.__class__._last_failed_request) < self.__class__._error_timeout:
-            self.logger.log(logging.INFO,
-                            "Request failed recently, waiting for timeout")
-            self.add_default_headers()
-            self.send_error(500)
-            return
+        # update cache if it does not exist
+        if self._cached_response is None:
+            if not (yield self.fetch_fresh_data()):
+                self.add_default_headers()
+                self.send_error(500)
+                return
 
+        self.add_default_headers()
+        self.write(self._cached_response)
+        self.finish()
+
+        # update cache if expired
         if self.is_request_outdated():
-            with (yield self.__class__._lock.acquire()):
-                if self.is_request_outdated():
-                    yield self.assemble_fresh_response()
-
-        else:
-            self.add_default_headers()
-            self.write(self._cached_response)
+            yield self.fetch_fresh_data()
 
     @gen.coroutine
     def assemble_stats(self):
@@ -216,7 +212,25 @@ class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
         }
 
     @gen.coroutine
-    def assemble_fresh_response(self):
+    def fetch_fresh_data(self) -> bool:
+        with (yield self.__class__._lock.acquire()):
+           if self.is_request_outdated():
+               return (yield self.assemble_fresh_response())
+        return True
+
+
+    @gen.coroutine
+    def assemble_fresh_response(self) -> bool:
+
+        # ensure that timeout is respected
+        now = datetime.now()
+        if self.__class__._last_failed_request is not None and \
+                (now - self.__class__._last_failed_request) < self.__class__._error_timeout:
+            self.logger.log(logging.INFO,
+                            "Request failed recently, waiting for timeout")
+            return False
+
+
         self.logger.log(logging.INFO, "Fetching latest release from GitHub")
 
         data = None
@@ -247,13 +261,10 @@ class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
 
         if failure:
             self.__class__._last_failed_request = datetime.now()
-            self.send_error(500)
             return False
 
         self.update_cache(data)
-        self.add_default_headers()
-        self.write(data)
-        self.finish()
+        return True
 
     @classmethod
     def update_cache(cls, data):
