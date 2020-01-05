@@ -31,7 +31,7 @@ def fetch(url: str):
         "User-Agent": ""
     })
     http_client = tornado.httpclient.AsyncHTTPClient()
-    return http_client.fetch(request, raise_error=True)
+    return http_client.fetch(request)
 
 
 @gen.coroutine
@@ -161,16 +161,15 @@ class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
             self.send_error(500)
             return
 
-        yield self.__class__._lock.acquire()
-
         if self.is_request_outdated():
-            yield self.assemble_fresh_response()
+            yield self.__class__._lock.acquire()
+            if self.is_request_outdated():
+                yield self.assemble_fresh_response()
+            yield self.__class__._lock.release()
 
         else:
             self.add_default_headers()
             self.write(self._cached_response)
-
-        yield self.__class__._lock.release()
 
     @gen.coroutine
     def assemble_stats(self):
