@@ -162,10 +162,9 @@ class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
             return
 
         if self.is_request_outdated():
-            yield self.__class__._lock.acquire()
-            if self.is_request_outdated():
-                yield self.assemble_fresh_response()
-            yield self.__class__._lock.release()
+            with (yield self.__class__._lock.acquire()):
+                if self.is_request_outdated():
+                    yield self.assemble_fresh_response()
 
         else:
             self.add_default_headers()
