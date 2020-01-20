@@ -134,7 +134,7 @@ class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
 
     def add_default_headers(self):
         self.add_header("Content-Type", "text/plain")
-        self.add_header("Access-Control-Allow-Origin", "newpipe.schabi.org")
+        self.add_header("Access-Control-Allow-Origin", "*")
 
     @classmethod
     def is_request_outdated(cls):
