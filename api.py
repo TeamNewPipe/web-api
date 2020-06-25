@@ -193,7 +193,7 @@ class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
         # might be some annoying A/B testing
         # therefore we make this more fault-tolerant by sending a negative value if we can't fetch the data from GitHub
         document = html.fromstring(contributors_data)
-        tags = document.cssselect(".numbers-summary a[href$=contributors] .num")
+        tags = document.cssselect(".BorderGrid a[href$=contributors] .Counter")
 
         try:
             contributors = int(tags[0].text)
