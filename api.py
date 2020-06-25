@@ -179,15 +179,16 @@ class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
         translations_url = "https://hosted.weblate.org/api/components/newpipe/" \
                            "strings/translations/"
 
-        repo_data, contributors_data = \
+        repo_data, contributors_data, translations_data = \
             [x.body for x in (yield gen.multi((
                 fetch(repo_url),
                 fetch(contributors_url),
+                fetch(translations_url),
             )))]
 
         repo = json.loads(repo_data.decode())
 
-        # translations = json.loads(translations_data.decode())
+        translations = json.loads(translations_data.decode())
 
         # no idea why, but sometimes we receive different responses from GitHub
         # might be some annoying A/B testing
@@ -213,7 +214,7 @@ class DataJsonHandler(tornado.web.RequestHandler, SentryMixin):
             "watchers": repo["subscribers_count"],
             "forks": repo["forks_count"],
             "contributors": contributors,
-            "translations": -1,
+            "translations": int(translations["count"]),
         }
 
     @gen.coroutine
