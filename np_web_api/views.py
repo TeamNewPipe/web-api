@@ -160,12 +160,6 @@ LOCK = asyncio.Lock()
 
 @bp.route("/data.json")
 async def data_json():
-    # default headers, common in all responses
-    headers = {
-        "Content-Type": "text/plain",
-        "Access-Control-Allow-Origin": "*",
-    }
-
     # we make the assumption that the cache works perfectly here, i.e., it will always deliver proper data once the
     # values were initially stored into it
     # in reality, it might fail occurrently and return None on all values, but the chance is so low we can ignore that
@@ -245,4 +239,10 @@ async def data_json():
         return Response("internal server error", 500)
 
     logger.debug(f"responding cached data: {repr(data)}")
-    return jsonify(data)
+
+    response = jsonify(data)
+
+    # set CORS header to allow access from any host to the data API
+    response.headers.set("Access-Control-Allow-Origin", "*")
+
+    return response
