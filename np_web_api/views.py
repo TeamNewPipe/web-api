@@ -117,10 +117,17 @@ async def assemble_stats():
     # might be some annoying A/B testing
     # therefore we make this more fault-tolerant by sending a negative value if we can't fetch the data from GitHub
     document = html.fromstring(contributors_data)
-    tags = document.cssselect(".numbers-summary a[href$=contributors] .num")
+    sidebar_cells_links = document.cssselect(".BorderGrid-cell .h4.mb-3 a")
 
     try:
-        contributors = int(tags[0].text)
+        for a in sidebar_cells_links:
+            if "contributors" in a.text.lower():
+                counter = a.cssselect(".Counter")[0]
+                contributors = int(counter.text)
+                break
+
+        else:
+            raise KeyError("could not find counter value")
 
     except:  # noqa: E722
         # whatever happens, we will just continue with -1 as default value
