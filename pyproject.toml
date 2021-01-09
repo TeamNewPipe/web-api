@@ -1,0 +1,34 @@
+[tool.black]
+line-length = 120
+
+[tool.poetry]
+name = "newpipe-web-api"
+version = "0.0.1"
+description = "NewPipe web API"
+authors = ["Team NewPipe"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/TeamNewPipe/web-api"
+repository = "https://github.com/TeamNewPipe/web-api.git"
+
+[tool.poetry.dependencies]
+# quart requires Python 3.7+
+python = "^3.7"
+lxml = "^4"
+cssselect = "*"
+# also needed by uvicorn
+PyYAML = "^5.0"
+Quart = "^0.14"
+aiohttp = "^3.7"
+Flask-Caching = "^1.9"
+sentry-sdk = "^0.19"
+uvicorn = {extras = ["standard"], version = "^0.13"}
+coloredlogs = "*"
+
+[tool.poetry.dev-dependencies]
+black = "*"
+flake8 = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
