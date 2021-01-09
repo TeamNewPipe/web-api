@@ -31,4 +31,4 @@ COPY np_web_api/ /app/np_web_api/
 
 # using just one worker worked fine so far, and allows for some very crappy "synchronization" between requests by just
 # using global variables, which help prevent concurrent requests to update cached data
-CMD ["poetry", "run", "uvicorn", "--factory", "np_web_api:make_app", "--host", "0.0.0.0", "--port", "5000", "--workers", "1"]
+CMD ["poetry", "run", "uvicorn", "--factory", "np_web_api:make_production_app", "--host", "0.0.0.0", "--port", "5000", "--workers", "1"]
