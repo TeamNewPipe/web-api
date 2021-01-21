@@ -24,7 +24,7 @@ COPY pyproject.toml poetry.lock /app/
 # note: pip doesn't support editable (-e) installs with pyproject.toml only
 RUN poetry install
 
-HEALTHCHECK --interval=5m --timeout=3s \
+HEALTHCHECK --interval=5m --timeout=15s \
     CMD curl -f http://localhost:5000/data.json || exit 1
 
 COPY np_web_api/ /app/np_web_api/
