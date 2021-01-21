@@ -13,7 +13,7 @@ from quart import Response, jsonify
 
 from . import bp, cache
 from ._logging import make_logger
-from ._util import fetch_text
+from ._util import fetch_text, RateLimitExceededError
 
 
 logger = make_logger("views")
@@ -226,6 +226,11 @@ async def data_json():
 
                 except aiohttp.client.ClientError:
                     logger.exception("API call failed")
+                    was_error = True
+                    sentry_sdk.capture_exception()
+
+                except RateLimitExceededError as e:
+                    logger.error(str(e))
                     was_error = True
                     sentry_sdk.capture_exception()
 
