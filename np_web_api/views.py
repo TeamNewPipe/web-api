@@ -256,7 +256,12 @@ async def data_json():
     if was_error:
         if not data:
             logger.debug("error and no cached data, responding with status 500")
-            return Response("internal server error", 500)
+
+            headers = {
+                "retry-after": error_timeout.total_seconds()
+            }
+
+            return Response("temporary issues, try again later", 503, headers=headers)
 
         logger.error("error occurred during data update, responding with old data")
 
