@@ -181,11 +181,21 @@ async def data_json():
         #   - this is the first run (first case)
         #   - there was an error and the error timeout is over (second case)
         #   - the last run succeeded, but the timeout is over
-        return (
-            (not last_updated or not data)
-            or (was_error and (last_updated + error_timeout) < now)
-            or ((last_updated + normal_timeout) < now)
-        )
+
+        if not last_updated and not data:
+            logger.info("first run")
+            return True
+
+        if was_error and (last_updated + error_timeout) < now:
+            logger.info("error timeout hit")
+            return True
+
+        if (last_updated + normal_timeout) < now:
+            logger.info("normal timeout hit")
+            return True
+
+        logger.debug("request not outdated")
+        return False
 
     # usual timeouts for cached data
     # we do this to avoid sending too many requests to the third-party APIs, as these are usually heavily rate-limited
