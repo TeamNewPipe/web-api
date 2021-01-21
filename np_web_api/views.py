@@ -241,6 +241,7 @@ async def data_json():
                 last_updated = now
 
                 # update cache only here to save time
+                logger.info("updating cache")
                 cache.set_many(
                     {
                         "was_error": was_error,
