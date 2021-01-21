@@ -241,9 +241,12 @@ async def data_json():
         logger.debug("cache appears up to date, responding with cached data (if available)")
 
     # may only ever happen when calls fail directly after a restart
-    if was_error and not data:
-        logger.debug("error and no cached data, responding with status 500")
-        return Response("internal server error", 500)
+    if was_error:
+        if not data:
+            logger.debug("error and no cached data, responding with status 500")
+            return Response("internal server error", 500)
+
+        logger.error("error occurred during data update, responding with old data")
 
     logger.debug(f"responding cached data: {repr(data)}")
 
