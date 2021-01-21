@@ -227,10 +227,12 @@ async def data_json():
                 except aiohttp.client.ClientError:
                     logger.exception("API call failed")
                     was_error = True
+                    sentry_sdk.capture_exception()
 
                 except:  # noqa: E722
                     logger.exception("Unknown error occured, see next line")
                     was_error = True
+                    sentry_sdk.capture_exception()
 
                 else:
                     was_error = False
