@@ -104,14 +104,14 @@ async def assemble_stats():
     translations_url = "https://hosted.weblate.org/api/components/newpipe/" \
                        "strings/translations/"
 
-    repo_data, contributors_data, translations_data = await asyncio.gather(
+    repo_data, contributors_data = await asyncio.gather(
         fetch_text(repo_url),
         fetch_text(contributors_url),
-        fetch_text(translations_url),
+        # fetch_text(translations_url),
     )
 
     repo = json.loads(repo_data)
-    translations = json.loads(translations_data)
+    # translations = json.loads(translations_data)
 
     # no idea why, but sometimes we receive different responses from GitHub
     # might be some annoying A/B testing
@@ -145,7 +145,7 @@ async def assemble_stats():
         "watchers": repo["subscribers_count"],
         "forks": repo["forks_count"],
         "contributors": contributors,
-        "translations": int(translations["count"]),
+        "translations": -1,
     }
 
 
