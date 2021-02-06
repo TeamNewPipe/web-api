@@ -11,7 +11,7 @@ cache = Cache(with_jinja2_ext=False, config={"CACHE_TYPE": "simple"})
 from . import views  # noqa: E402 F401
 
 # must be imported last for obvious reasons
-from .app import make_app, make_production_app  # noqa: E402
+from .app import make_app  # noqa: E402
 
 
 # let users auto-import only make_app
