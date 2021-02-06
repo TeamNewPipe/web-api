@@ -8,14 +8,19 @@ from . import cache, bp
 
 
 def make_app(debug: bool = False):
-    app = Quart(__name__)
+    app = Quart(__name__, debug=debug)
 
+    # init Quart/Flask extensions
     cache.init_app(app)
-    sentry_url = os.environ.get("SENTRY_URL", None)
 
     # register views
     app.register_blueprint(bp)
 
+    # enable Sentry integration, if the user provides a DSN
+    sentry_url = os.environ.get("SENTRY_URL", None)
+
+    # the middleware interferes with interactive debugging
+    # to "fix" that, we don't want to integrate Sentry when it's enabled
     if not debug and sentry_url:
         print("Setting up Sentry integration")
         sentry_sdk.init(dsn=sentry_url)
@@ -23,4 +28,3 @@ def make_app(debug: bool = False):
         app = SentryAsgiMiddleware(app)
 
     return app
-
