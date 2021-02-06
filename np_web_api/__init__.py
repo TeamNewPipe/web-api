@@ -11,10 +11,13 @@ bp = Blueprint(__name__, "bp")
 # see https://github.com/sh4nks/flask-caching/issues/183 for more information
 # simple cache means in-memory, which avoids unnecessary disk I/O and simplifies debugging
 # also, it works well when synchronizing the requests as we do to avoid third-party API rate limits
-cache = Cache(with_jinja2_ext=False, config={
-    "CACHE_TYPE": "simple",
-    "CACHE_DEFAULT_TIMEOUT": 2**31,
-})
+cache = Cache(
+    with_jinja2_ext=False,
+    config={
+        "CACHE_TYPE": "simple",
+        "CACHE_DEFAULT_TIMEOUT": 2 ** 31,
+    },
+)
 
 
 # must import these after creating bp/cache

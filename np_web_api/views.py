@@ -101,8 +101,7 @@ async def assemble_flavors():
 async def assemble_stats():
     repo_url = "https://api.github.com/repos/TeamNewPipe/NewPipe"
     contributors_url = "https://github.com/TeamNewPipe/NewPipe"
-    translations_url = "https://hosted.weblate.org/api/components/newpipe/" \
-                       "strings/translations/"
+    translations_url = "https://hosted.weblate.org/api/components/newpipe/strings/translations/"
 
     repo_data, contributors_data, translations_data = await asyncio.gather(
         fetch_text(repo_url),
@@ -264,7 +263,7 @@ async def data_json():
             logger.debug("error and no cached data, responding with status 500")
 
             headers = {
-                "retry-after": error_timeout.total_seconds()
+                "retry-after": error_timeout.total_seconds(),
             }
 
             return Response("temporary issues, try again later", 503, headers=headers)
