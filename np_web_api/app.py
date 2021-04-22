@@ -8,7 +8,7 @@ from . import cache, bp
 
 
 def make_app(debug: bool = False):
-    app = Quart(__name__, debug=debug)
+    app = Quart(__name__)
 
     # init Quart/Flask extensions
     cache.init_app(app)
