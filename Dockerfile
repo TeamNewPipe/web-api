@@ -6,7 +6,7 @@ MAINTAINER "TheAssassin <theassassin@assassinate-you.net>"
 EXPOSE 5000
 
 # install dependencies
-RUN apk add --no-cache gcc libxml2-dev libxml2 musl-dev xmlsec xmlsec-dev curl libffi-dev openssl-dev make
+RUN apk add --no-cache gcc libxml2-dev libxml2 musl-dev xmlsec xmlsec-dev curl libffi-dev openssl-dev make rust cargo
 
 # create non-root user
 RUN adduser -S app
