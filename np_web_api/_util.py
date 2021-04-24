@@ -14,8 +14,8 @@ class RateLimitExceededError(Exception):
             reset = None
         else:
             try:
-                reset = datetime.fromtimestamp(reset)
-            except ValueError:
+                reset = datetime.fromtimestamp(float(reset))
+            except (ValueError, TypeError):
                 pass
 
         if not reset:
