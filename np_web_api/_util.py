@@ -8,10 +8,18 @@ class RateLimitExceededError(Exception):
         self.response = response
 
     def __str__(self):
-        if "github.com" in self.response.url.host:
-            reset = datetime.fromtimestamp(self.response.headers["x-ratelimit-reset"])
-        else:
+        try:
             reset = self.response.headers["x-ratelimit-reset"]
+        except KeyError:
+            reset = None
+        else:
+            try:
+                reset = datetime.fromtimestamp(reset)
+            except ValueError:
+                pass
+
+        if not reset:
+            reset = "unknown"
 
         return f"{self.response.url}: rate limit exceeded, reset: {reset}"
 
