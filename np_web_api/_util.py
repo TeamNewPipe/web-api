@@ -8,20 +8,28 @@ class RateLimitExceededError(Exception):
         self.response = response
 
     def __str__(self):
+        parsed_reset = None
+        reset = None
+
         try:
             reset = self.response.headers["x-ratelimit-reset"]
         except KeyError:
-            reset = None
-        else:
+            pass
+
+        if reset is not None:
             try:
-                reset = datetime.fromtimestamp(float(reset))
+                parsed_reset = datetime.fromtimestamp(float(reset))
             except (ValueError, TypeError):
                 pass
 
         if not reset:
-            reset = "unknown"
+            reset_msg = "unknown"
+        elif not parsed_reset:
+            reset_msg = reset
+        else:
+            reset_msg = f"{parsed_reset} ({reset})"
 
-        return f"{self.response.url}: rate limit exceeded, reset: {reset}"
+        return f"{self.response.url}: rate limit exceeded, reset: {reset_msg}"
 
 
 async def fetch_text(url: str):
