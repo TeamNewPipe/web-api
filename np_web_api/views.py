@@ -24,15 +24,17 @@ async def get_github_flavor(repo_name: str):
     html_string = await fetch_text(url)
     document = html.fromstring(html_string)
 
-    # defined as a coroutine (pointlessly) to be compatible with the other closures
+    release_elem = document.cssselect("[data-pjax] > .d-flex")[1]
+    release_card = document.cssselect("[data-test-selector='release-card']")[0]
+
     def get_version_str() -> str:
-        tags = document.cssselect(".release .float-left ul li a.css-truncate > span.css-truncate-target")
+        tags = release_card.cssselect("h1 a")
         return tags[0].text
 
     gradle_template = "https://raw.githubusercontent.com/TeamNewPipe/{}/{}/app/build.gradle"
 
     async def get_version_code() -> int:
-        tags = document.cssselect(".release .float-left ul li a code")
+        tags = release_elem.cssselect("[data-pjax='#repo-content-pjax-container'] code")
         repo_hash = tags[0].text
 
         gradle_file_data = await fetch_text(gradle_template.format(repo_name, repo_hash))
@@ -44,7 +46,7 @@ async def get_github_flavor(repo_name: str):
         return int(version_codes[0].split(" ")[-1])
 
     def get_apk_url() -> str:
-        tags = document.cssselect('.release-main-section details a[href$=".apk"]')
+        tags = release_card.cssselect('.Box-footer .mb-3 details a[href$=".apk"]')
         return "https://github.com" + tags[0].get("href")
 
     # only one of these is defined as async, so instead of pointlessly defining all closures async, we can define them
