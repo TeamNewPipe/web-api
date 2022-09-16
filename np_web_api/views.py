@@ -28,8 +28,9 @@ async def get_github_flavor(repo_name: str):
     release_card = document.cssselect("[data-test-selector='release-card']")[0]
 
     def get_version_str() -> str:
-        tags = release_card.cssselect("h1 a")
-        return tags[0].text
+        # we can just look for the tag icon, then navigate to the span that contains the tag name
+        tags = release_elem.cssselect("svg.octicon-tag")[0].xpath("../..")[0].cssselect("span")
+        return tags[0].text.strip(" \t\r\n")
 
     gradle_template = "https://raw.githubusercontent.com/TeamNewPipe/{}/{}/app/build.gradle"
 
@@ -45,17 +46,22 @@ async def get_github_flavor(repo_name: str):
         version_codes = re.findall("versionCode(.*)", gradle_file_data)
         return int(version_codes[0].split(" ")[-1])
 
-    def get_apk_url() -> str:
-        tags = release_card.cssselect('.Box-footer .mb-3 details a[href$=".apk"]')
+    version = get_version_str()
+
+    async def get_apk_url() -> str:
+        expanded_assets_url = f"{url}/expanded_assets/{version}"
+        expanded_assets_html = await fetch_text(expanded_assets_url)
+        expanded_assets_document = html.fromstring(expanded_assets_html)
+        tags = expanded_assets_document.cssselect("ul li svg.octicon-package")[0].xpath("..")[0].cssselect('a[href$=".apk"]')
         return "https://github.com" + tags[0].get("href")
 
     # only one of these is defined as async, so instead of pointlessly defining all closures async, we can define them
     # as regular functions, and just await the one that really is a coroutine
     return {
         "stable": {
-            "version": get_version_str(),
+            "version": version,
             "version_code": await get_version_code(),
-            "apk": get_apk_url(),
+            "apk": await get_apk_url(),
         }
     }
 
