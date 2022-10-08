@@ -24,8 +24,7 @@ async def get_github_flavor(repo_name: str):
     html_string = await fetch_text(url)
     document = html.fromstring(html_string)
 
-    release_elem = document.cssselect("[data-pjax] > .d-flex")[1]
-    release_card = document.cssselect("[data-test-selector='release-card']")[0]
+    release_elem = document.cssselect("[data-pjax] .d-flex")[1]
 
     def get_version_str() -> str:
         # we can just look for the tag icon, then navigate to the span that contains the tag name
