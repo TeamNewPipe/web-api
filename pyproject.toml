@@ -13,16 +13,16 @@ repository = "https://github.com/TeamNewPipe/web-api.git"
 
 [tool.poetry.dependencies]
 # quart requires Python 3.7+
-python = "^3.7"
+python = "^3.8"
 lxml = "^4"
 cssselect = "*"
 # also needed by uvicorn
-PyYAML = "^5.0"
+PyYAML = "^6.0.1"
 Quart = "^0.14"
 aiohttp = "^3.7"
 Flask-Caching = "^1.9"
 sentry-sdk = "^0.19"
-uvicorn = {extras = ["standard"], version = "^0.13"}
+uvicorn = {extras = ["standard"], version = "^0.14"}
 coloredlogs = "*"
 
 [tool.poetry.dev-dependencies]
