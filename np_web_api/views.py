@@ -1,13 +1,11 @@
 import asyncio
 import json
 import logging
-import re
 from datetime import datetime, timedelta
 from typing import Optional
 
 import aiohttp
 import sentry_sdk
-import yaml
 from lxml import html
 from quart import Response, jsonify
 
@@ -19,89 +17,64 @@ from ._util import fetch_text, RateLimitExceededError
 logger = make_logger("views")
 
 
-async def get_github_flavor(repo_name: str):
-    url = "https://github.com/TeamNewPipe/{}/releases/".format(repo_name)
-    html_string = await fetch_text(url)
-    document = html.fromstring(html_string)
+async def get_info_from_fdroid_repo(package: str, repo_url: str):
+    """
+    Get the APK info from an F-Droid repository.
+    :param package: the package name
+    :param repo_url: the repository URL with a trailing slash '/'
+    :return: dict with the parsed info
+    """
+    # TODO in case multiple packages are read from one repo: pre-fetch indices before calling this coroutine
+    json_string = await fetch_text(repo_url + "index-v1.json")
+    data = json.loads(json_string)
 
-    release_elem = document.cssselect("[data-pjax] .d-flex")[1]
+    version = -1
+    version_code = -1
+    apk_url = -1
+    hash_sum = -1,
+    hash_type = -1
 
-    def get_version_str() -> str:
-        # we can just look for the tag icon, then navigate to the span that contains the tag name
-        tags = release_elem.cssselect("svg.octicon-tag")[0].xpath("../..")[0].cssselect("span")
-        return tags[0].text.strip(" \t\r\n")
+    if 'apps' in data:
+        for app in data['apps']:
+            if app['packageName'] == package:
+                version = app['suggestedVersionName']
+                # why the hell is the code a string here apps, but an int below in packages...
+                version_code = int(app['suggestedVersionCode'])
+                break
 
-    gradle_template = "https://raw.githubusercontent.com/TeamNewPipe/{}/{}/app/build.gradle"
+        if 'packages' in data and package in data['packages']:
+            for version_info in data['packages'][package]:
+                logger.info(version_code)
+                logger.info(version_info['versionCode'])
+                logger.info(version_info)
+                if version_info['versionCode'] == version_code:
+                    version = version_info['versionName']
+                    version_code = version_info['versionCode']
 
-    async def get_version_code() -> int:
-        tags = release_elem.cssselect("[data-pjax='#repo-content-pjax-container'] code")
-        repo_hash = tags[0].text
+                    apk_name = version_info['apkName']
+                    apk_url = repo_url + apk_name
 
-        gradle_file_data = await fetch_text(gradle_template.format(repo_name, repo_hash))
-
-        if isinstance(gradle_file_data, bytes):
-            gradle_file_data = gradle_file_data.decode()
-
-        version_codes = re.findall("versionCode(.*)", gradle_file_data)
-        return int(version_codes[0].split(" ")[-1])
-
-    version = get_version_str()
-
-    async def get_apk_url() -> str:
-        expanded_assets_url = f"{url}/expanded_assets/{version}"
-        expanded_assets_html = await fetch_text(expanded_assets_url)
-        expanded_assets_document = html.fromstring(expanded_assets_html)
-        tags = expanded_assets_document.cssselect("ul li svg.octicon-package")[0].xpath("..")[0].cssselect('a[href$=".apk"]')
-        return "https://github.com" + tags[0].get("href")
-
-    # only one of these is defined as async, so instead of pointlessly defining all closures async, we can define them
-    # as regular functions, and just await the one that really is a coroutine
-    return {
-        "stable": {
-            "version": version,
-            "version_code": await get_version_code(),
-            "apk": await get_apk_url(),
-        }
-    }
-
-
-async def get_fdroid_flavor(package_name: str):
-    template = "https://gitlab.com/fdroid/fdroiddata/raw/master/metadata/{}.yml"
-    url = template.format(package_name)
-
-    version_data = await fetch_text(url)
-
-    data = yaml.safe_load(version_data)
-
-    latest_version = data["Builds"][-1]
-    version = latest_version["versionName"]
-    version_code = latest_version["versionCode"]
-
-    apk_template = "https://f-droid.org/repo/{}_{}.apk"
-    apk_url = apk_template.format(package_name, version_code)
+                    hash_sum = version_info['hash']
+                    hash_type = version_info['hashType']
 
     return {
-        "stable": {
-            "version": version,
-            "version_code": version_code,
-            "apk": apk_url,
-        }
+        "version": version,
+        "version_code": version_code,
+        "apk": apk_url,
+        "hash": hash_sum,
+        "hash_type": hash_type
     }
 
 
 async def assemble_flavors():
-    github_flavor, fdroid_flavor, legacy_github_flavor, legacy_fdroid_flavor = await asyncio.gather(
-        get_github_flavor("NewPipe"),
-        get_fdroid_flavor("org.schabi.newpipe"),
-        get_github_flavor("NewPipe-legacy"),
-        get_fdroid_flavor("org.schabi.newpipelegacy"),
+    newpipe_flavor, fdroid_flavor = await asyncio.gather(
+        get_info_from_fdroid_repo("org.schabi.newpipe", "https://archive.newpipe.net/fdroid/repo/"),
+        get_info_from_fdroid_repo("org.schabi.newpipe", "https://f-droid.org/repo/"),
     )
 
     return {
-        "github": github_flavor,
+        "newpipe": newpipe_flavor,
         "fdroid": fdroid_flavor,
-        "github_legacy": legacy_github_flavor,
-        "fdroid_legacy": legacy_fdroid_flavor,
     }
 
 
