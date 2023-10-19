@@ -73,6 +73,9 @@ async def assemble_flavors():
     )
 
     return {
+        "github": {
+            "stable": newpipe_flavor,
+        },
         "newpipe": newpipe_flavor,
         "fdroid": fdroid_flavor,
     }
