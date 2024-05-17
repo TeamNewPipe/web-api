@@ -13,7 +13,7 @@ repository = "https://github.com/TeamNewPipe/web-api.git"
 
 [tool.poetry.dependencies]
 # quart requires Python 3.7+
-python = "^3.8"
+python = "^3.10"
 lxml = "^4"
 cssselect = "*"
 # also needed by uvicorn
