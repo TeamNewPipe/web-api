@@ -10,6 +10,7 @@ license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/TeamNewPipe/web-api"
 repository = "https://github.com/TeamNewPipe/web-api.git"
+package-mode = false
 
 [tool.poetry.dependencies]
 # quart requires Python 3.7+
