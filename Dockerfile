@@ -1,34 +1,25 @@
-FROM python:3.10-alpine
+FROM python:3.10-slim
 
 MAINTAINER "TheAssassin <theassassin@assassinate-you.net>"
 
 # this port won't ever change, really
 EXPOSE 5000
 
-# install dependencies
-RUN apk add --no-cache gcc libxml2-dev libxml2 musl-dev xmlsec xmlsec-dev curl libffi-dev openssl-dev make rust cargo
-
 # create non-root user
-RUN adduser -S app
-
-# install poetry system-wide, the rest per user
-# for some reason, we can't just pip install the entire package, but have to invoke poetry directly...
-RUN pip install poetry
+RUN adduser app
 
 USER app
 WORKDIR /app
 
-# must provide both the
-COPY pyproject.toml poetry.lock /app/
+COPY README.md pyproject.toml poetry.lock /app/
+COPY np_web_api/ /app/np_web_api/
 
 # note: pip doesn't support editable (-e) installs with pyproject.toml only
-RUN poetry install
+RUN pip install .
 
 HEALTHCHECK --interval=5m --timeout=15s \
     CMD curl -f http://localhost:5000/data.json || exit 1
 
-COPY np_web_api/ /app/np_web_api/
-
 # using just one worker worked fine so far, and allows for some very crappy "synchronization" between requests by just
 # using global variables, which help prevent concurrent requests to update cached data
-CMD ["poetry", "run", "uvicorn", "np_web_api.asgi:app", "--host", "0.0.0.0", "--port", "5000", "--workers", "1", "--no-access-log"]
+CMD ["python", "-m", "uvicorn", "np_web_api.asgi:app", "--host", "0.0.0.0", "--port", "5000", "--workers", "1", "--no-access-log"]
