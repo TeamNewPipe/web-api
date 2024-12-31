@@ -1,5 +1,7 @@
 FROM python:3.13-slim
 
+LABEL org.opencontainers.image.source="https://github.com/TeamNewPipe/web-api"
+
 MAINTAINER "TheAssassin <theassassin@assassinate-you.net>"
 
 # this port won't ever change, really
