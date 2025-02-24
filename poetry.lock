@@ -348,17 +348,17 @@ dotenv = ["python-dotenv"]
 
 [[package]]
 name = "flask-caching"
-version = "2.3.0"
+version = "2.3.1"
 description = "Adds caching support to Flask applications."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "Flask_Caching-2.3.0-py3-none-any.whl", hash = "sha256:51771c75682e5abc1483b78b96d9131d7941dc669b073852edfa319dd4e29b6e"},
-    {file = "flask_caching-2.3.0.tar.gz", hash = "sha256:d7e4ca64a33b49feb339fcdd17e6ba25f5e01168cf885e53790e885f83a4d2cf"},
+    {file = "Flask_Caching-2.3.1-py3-none-any.whl", hash = "sha256:d3efcf600e5925ea5a2fcb810f13b341ae984f5b52c00e9d9070392f3ca10761"},
+    {file = "flask_caching-2.3.1.tar.gz", hash = "sha256:65d7fd1b4eebf810f844de7de6258254b3248296ee429bdcb3f741bcbf7b98c9"},
 ]
 
 [package.dependencies]
-cachelib = ">=0.9.0,<0.10.0"
+cachelib = ">=0.9.0"
 Flask = "*"
 
 [[package]]
