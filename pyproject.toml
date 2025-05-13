@@ -16,7 +16,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.12"
-lxml = "^5.3"
+lxml = "^5.4"
 cssselect = "*"
 # also needed by uvicorn
 PyYAML = "^6.0.1"
