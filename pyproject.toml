@@ -19,7 +19,7 @@ python = "^3.12"
 lxml = "^6.0"
 cssselect = "*"
 # also needed by uvicorn
-PyYAML = "^6.0.1"
+PyYAML = "^6.0.3"
 Quart = "^0.20"
 aiohttp = "^3.12"
 Flask-Caching = "^2.3"
