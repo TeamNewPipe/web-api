@@ -21,7 +21,7 @@ cssselect = "*"
 # also needed by uvicorn
 PyYAML = "^6.0.3"
 Quart = "^0.20"
-aiohttp = "^3.12"
+aiohttp = "^3.13"
 Flask-Caching = "^2.3"
 sentry-sdk = "^2.39"
 uvicorn = {extras = ["standard"], version = "^0.37"}
