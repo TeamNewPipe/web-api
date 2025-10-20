@@ -24,7 +24,7 @@ Quart = "^0.20"
 aiohttp = "^3.13"
 Flask-Caching = "^2.3"
 sentry-sdk = "^2.39"
-uvicorn = {extras = ["standard"], version = "^0.37"}
+uvicorn = {extras = ["standard"], version = "^0.38"}
 coloredlogs = "*"
 
 [tool.poetry.dev-dependencies]
