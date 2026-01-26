@@ -23,7 +23,7 @@ PyYAML = "^6.0.3"
 Quart = "^0.20"
 aiohttp = "^3.13"
 Flask-Caching = "^2.3"
-sentry-sdk = "^2.49"
+sentry-sdk = "^2.50"
 uvicorn = {extras = ["standard"], version = "^0.40"}
 coloredlogs = "*"
 
