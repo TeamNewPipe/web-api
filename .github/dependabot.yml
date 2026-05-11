@@ -5,6 +5,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    allow:
+      # ignore prereleases by allowing just semver patch release changes
+      - update-types:
+        - "version-update:semver-patch"
 
   - package-ecosystem: "pip"
     directory: "/"
