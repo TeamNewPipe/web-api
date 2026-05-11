@@ -1,4 +1,4 @@
-FROM python:3.14.3-slim
+FROM python:3.14.4-slim
 
 LABEL org.opencontainers.image.source="https://github.com/TeamNewPipe/web-api"
 
