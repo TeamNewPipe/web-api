@@ -8,6 +8,7 @@ updates:
     ignore:
       - dependency-name: "python"
         versions:
+          - "*.*.*a*"
           - "*.*.*b*"
 
   - package-ecosystem: "pip"
