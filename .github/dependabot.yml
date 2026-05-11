@@ -5,11 +5,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    ignore:
-      - dependency-name: "python"
-        versions:
-          - "*.*.*a*"
-          - "*.*.*b*"
+    allow:
+      # ignore prereleases by allowing just semver patch release changes
+      - update-types:
+        - "version-update:semver-patch"
 
   - package-ecosystem: "pip"
     directory: "/"
