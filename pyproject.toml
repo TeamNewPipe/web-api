@@ -20,7 +20,7 @@ lxml = "^6.0"
 cssselect = "*"
 # also needed by uvicorn
 PyYAML = "^6.0.3"
-Quart = ">=0.20,<0.22"
+Quart = ">=0.20,<0.23"
 aiohttp = "^3.13"
 Flask-Caching = "^2.3"
 sentry-sdk = "^2.57"
