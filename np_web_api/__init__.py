@@ -14,7 +14,7 @@ bp = Blueprint(__name__, "bp")
 cache = Cache(
     with_jinja2_ext=False,
     config={
-        "CACHE_TYPE": "simple",
+        "CACHE_TYPE": "SimpleCache",
         "CACHE_DEFAULT_TIMEOUT": 2 ** 31,
     },
 )
